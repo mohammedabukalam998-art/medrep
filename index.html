@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#086248">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>MedRep</title>
+<style>
+:root{
+  --paper:#F6F8F9; --surface:#FFFFFF; --ink:#12232B; --muted:#5E7079; --line:#D9E1E4;
+  --green:#086248; --green-soft:#E3F1EB; --amber:#B97800; --amber-soft:#FBF0D8;
+  --red:#B3261E; --red-soft:#FBE6E4; --blue:#1F5F8B;
+  --bar-h:62px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#0E181D; --surface:#16242B; --ink:#E8EFF1; --muted:#93A5AD; --line:#27393F;
+    --green:#3DBE92; --green-soft:#12342B; --amber:#E3A524; --amber-soft:#382B0E;
+    --red:#F0776F; --red-soft:#3B1A18; --blue:#6DB3E0; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Noto Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;font-size:16px;line-height:1.55}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{max-width:720px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 12px)}
+header.top{position:sticky;top:0;z-index:5;background:var(--paper);display:flex;align-items:center;gap:10px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;border-bottom:1px solid var(--line)}
+header.top h1{font-size:19px;margin:0;flex:1}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:99px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.chip.off{background:var(--amber-soft);color:var(--amber)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:38px;height:38px;display:grid;place-items:center;cursor:pointer}
+main{padding:14px 16px}
+h2{font-size:15px;margin:22px 0 6px;color:var(--muted);font-weight:600}
+.tabbar{position:fixed;inset:auto 0 0 0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar .in{display:flex;width:100%;max-width:720px}
+.tab{flex:1;height:var(--bar-h);border:0;background:none;display:grid;place-items:center;align-content:center;gap:2px;
+  color:var(--muted);font-size:12px;cursor:pointer}
+.tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--green);font-weight:700}
+.btn{border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer;background:var(--green);color:#fff;font-size:16px}
+.btn.alt{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--surface);color:var(--red);border:1px solid var(--line)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.row-btns{display:flex;gap:10px;margin-top:14px}.row-btns .btn{flex:1}
+.stats{display:flex;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.stat{flex:1;padding:12px;text-align:center}
+.stat+.stat{border-inline-start:1px solid var(--line)}
+.stat b{display:block;font-size:26px;line-height:1.1}
+.stat span{font-size:13px;color:var(--muted)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.item{display:flex;gap:12px;align-items:center;padding:13px 14px;border-bottom:1px solid var(--line);cursor:pointer;
+  border-inline-start:5px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item.planned{border-inline-start-color:var(--amber)}
+.item.completed{border-inline-start-color:var(--green)}
+.item.late,.item.missed{border-inline-start-color:var(--red)}
+.item.cancelled{opacity:.6}
+.time{min-width:58px;text-align:center;font-weight:800;font-size:18px;line-height:1.15}
+.time small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+.grow{flex:1;min-width:0}
+.name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{font-size:12px;padding:2px 9px;border-radius:99px;background:var(--amber-soft);color:var(--amber);white-space:nowrap}
+.badge.completed{background:var(--green-soft);color:var(--green)}
+.badge.late,.badge.missed{background:var(--red-soft);color:var(--red)}
+.badge.cancelled{background:var(--line);color:var(--muted)}
+.empty{padding:26px 16px;text-align:center;color:var(--muted)}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;padding:9px 6px;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--green);color:#fff;font-weight:700}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:16px}
+textarea{min-height:96px;resize:vertical}
+label{display:block;font-size:13.5px;color:var(--muted);margin:14px 0 5px}
+.checks label{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:16px;margin:0;padding:9px 12px;border-bottom:1px solid var(--line)}
+.checks label:last-child{border-bottom:0}
+.checks input{width:20px;height:20px;accent-color:var(--green)}
+.box{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.kv:last-child{border-bottom:0}.kv span{color:var(--muted)}
+.sheet{position:fixed;inset:0;z-index:10;background:var(--paper);overflow:auto}
+.sheet[hidden]{display:none}
+.sheet .in{max-width:720px;margin:0 auto;padding-bottom:40px}
+.sheet header.top{position:sticky}
+#toast{position:fixed;inset:auto 16px calc(var(--bar-h) + 24px) 16px;z-index:20;display:grid;place-items:center;pointer-events:none}
+#toast div{background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:14.5px}
+.center{min-height:100vh;display:grid;place-items:center;padding:24px}
+.login{width:100%;max-width:360px}
+.logo{width:64px;height:64px;border-radius:16px;margin-bottom:14px}
+.err{color:var(--red);font-size:14px;min-height:20px;margin-top:10px}
+.note{font-size:13.5px;color:var(--muted);margin-top:8px}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet" class="sheet" hidden></div>
+<div id="toast"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* ================= أدوات عامة ================= */
+const CFG = window.MEDREP_CONFIG || {};
+const sb = (window.supabase && CFG.key && !CFG.key.startsWith("PASTE"))
+  ? window.supabase.createClient(CFG.url, CFG.key) : null;
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }));
+const nowISO = () => new Date().toISOString();
+const ROLE = { owner: "مدير عام", admin: "مسؤول", manager: "مدير", rep: "مندوب" };
+const CTYPE = { doctor: "طبيب", pharmacy: "صيدلية", hospital: "مستشفى" };
+const VST = { planned: "مخططة", completed: "منتهية", missed: "فائتة", cancelled: "ملغاة", late: "متأخرة" };
+const isToday = (iso) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString("ar-u-nu-latn", { hour: "2-digit", minute: "2-digit" }) : "";
+const fmtDay = (iso) => iso ? new Date(iso).toLocaleDateString("ar-u-nu-latn", { day: "numeric", month: "short" }) : "";
+const toLocalInput = (d) => { const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const getPos = () => new Promise((res) => {
+  if (!navigator.geolocation) return res(null);
+  navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { timeout: 8000, maximumAge: 60000 });
+});
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.innerHTML = `<div>${esc(msg)}</div>`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.innerHTML = ""), 2600);
+}
+const ICON = {
+  home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  clients: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5a3.5 3.5 0 0 1 0 6.5M18 14c2.2.6 3.5 2.4 3.5 5"/>',
+  visits: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  me: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>',
+  sync: '<path d="M20 11a8 8 0 0 0-14-4M4 5v4h4M4 13a8 8 0 0 0 14 4M20 19v-4h-4"/>'
+};
+const svg = (n) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
+
+/* ================= التخزين المحلي (IndexedDB) ================= */
+const STORES = ["companies", "profiles", "clients", "products", "visits", "visit_reports"];
+let _db;
+const idb = () => (_db ||= new Promise((res, rej) => {
+  const r = indexedDB.open("medrep", 1);
+  r.onupgradeneeded = () => {
+    const d = r.result;
+    STORES.forEach((s) => d.createObjectStore(s, { keyPath: "id" }));
+    d.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true });
+    d.createObjectStore("meta", { keyPath: "k" });
+  };
+  r.onsuccess = () => res(r.result);
+  r.onerror = () => rej(r.error);
+}));
+const tx = (store, mode, fn) => idb().then((d) => new Promise((res, rej) => {
+  const t = d.transaction(store, mode); const out = fn(t.objectStore(store));
+  t.oncomplete = () => res(out ? out.result : undefined); t.onerror = () => rej(t.error);
+}));
+const dbAll = (s) => tx(s, "readonly", (o) => o.getAll());
+const dbGet = (s, k) => tx(s, "readonly", (o) => o.get(k));
+const dbPut = (s, v) => tx(s, "readwrite", (o) => o.put(v));
+const dbDel = (s, k) => tx(s, "readwrite", (o) => o.delete(k));
+const dbClear = async () => { for (const s of [...STORES, "outbox", "meta"]) await tx(s, "readwrite", (o) => o.clear()); };
+
+/* ================= الحالة ================= */
+const S = {
+  ready: false, setup: false, user: null, profile: null, company: null,
+  tab: "home", vf: "today", cf: "all", q: "", syncing: false, pending: 0, failed: 0, loginErr: "",
+  data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [] }
+};
+const KEYMAP = { companies: "companies", profiles: "profiles", clients: "clients", products: "products", visits: "visits", reports: "visit_reports" };
+async function loadLocal() {
+  for (const k of Object.keys(KEYMAP)) S.data[k] = (await dbAll(KEYMAP[k])).filter((r) => !r.deleted_at);
+  S.profile = S.user ? S.data.profiles.find((p) => p.id === S.user.id) || null : null;
+  S.company = S.data.companies[0] || null;
+}
+async function refreshPending() {
+  const items = await dbAll("outbox");
+  S.pending = items.filter((i) => !i.failed).length; S.failed = items.filter((i) => i.failed).length;
+  refreshStatus();
+}
+function refreshStatus() {
+  const c = $("#chip"); if (!c) return;
+  const on = navigator.onLine;
+  c.className = "chip" + (on ? "" : " off");
+  c.textContent = S.syncing ? "جاري المزامنة…" : (on ? "متصل" : "بدون إنترنت") + (S.pending ? ` • ${S.pending} بانتظار الرفع` : "");
+}
+
+/* ================= المزامنة ================= */
+const isNet = (e) => /fetch|network|load failed/i.test(e?.message || "");
+async function save(table, row) {
+  row.updated_at = nowISO();
+  await dbPut(table, row);
+  await dbPut("outbox", { table, row: { ...row } });
+  await loadLocal(); await refreshPending(); render();
+  sync();
+}
+async function push() {
+  const items = (await dbAll("outbox")).sort((a, b) => a.seq - b.seq);
+  for (const it of items) {
+    if (it.failed) continue;
+    const { error } = await sb.from(it.table).upsert(it.row);
+    if (error) {
+      if (isNet(error)) throw error;
+      it.failed = true; it.err = error.message; await dbPut("outbox", it); continue;
+    }
+    await dbDel("outbox", it.seq);
+  }
+}
+async function pull() {
+  const pend = new Set((await dbAll("outbox")).filter((i) => !i.failed).map((i) => i.row.id));
+  for (const t of STORES) {
+    let last = (await dbGet("meta", "last_" + t))?.v || "1970-01-01T00:00:00Z";
+    for (;;) {
+      const { data, error } = await sb.from(t).select("*").gt("updated_at", last).order("updated_at").limit(500);
+      if (error) throw error;
+      if (!data.length) break;
+      for (const r of data) if (!pend.has(r.id)) await dbPut(t, r);
+      last = data[data.length - 1].updated_at;
+      await dbPut("meta", { k: "last_" + t, v: last });
+      if (data.length < 500) break;
+    }
+  }
+}
+async function sync(manual) {
+  if (S.syncing || !sb || !S.user) return;
+  if (!navigator.onLine) { if (manual) toast("لا يوجد إنترنت الآن"); return; }
+  S.syncing = true; refreshStatus();
+  try {
+    await push(); await pull(); await loadLocal();
+    if (manual) toast("تمت المزامنة");
+  } catch (e) { console.warn(e); if (manual) toast("تعذرت المزامنة، سنحاول لاحقا"); }
+  S.syncing = false; await refreshPending();
+  if (!$("#sheet") || $("#sheet").hidden) render();
+}
+
+/* ================= الشاشات ================= */
+const clientOf = (id) => S.data.clients.find((c) => c.id === id);
+const repName = (id) => S.data.profiles.find((p) => p.id === id)?.full_name || "—";
+const isMgr = () => ["owner", "admin", "manager"].includes(S.profile?.role);
+const effStatus = (v) => (v.status === "planned" && v.planned_at && new Date(v.planned_at) < startOfToday()) ? "late" : v.status;
+
+function render() {
+  const app = $("#app");
+  if (!S.ready) { app.innerHTML = `<div class="center">جاري التحميل…</div>`; return; }
+  if (S.setup) {
+    app.innerHTML = `<div class="center"><div class="login"><h1>إعداد مطلوب</h1>
+      <p>لم يُضبط مفتاح Supabase بعد. افتح الملف <b>config.js</b> والصق المفتاح العام بدل <code>PASTE_PUBLISHABLE_KEY_HERE</code>، ثم أعد فتح الصفحة.</p></div></div>`;
+    return;
+  }
+  if (!S.user || !S.profile) { app.innerHTML = loginView(); return; }
+  const titles = { home: "اليوم", clients: "العملاء", visits: "الزيارات", me: "حسابي" };
+  const body = { home: homeView, clients: clientsView, visits: visitsView, me: meView }[S.tab]();
+  app.innerHTML = `<header class="top"><h1>${titles[S.tab]}</h1><span id="chip" class="chip"></span>
+    <button class="iconbtn" data-act="sync" aria-label="مزامنة">${svg("sync")}</button></header>
+    <main>${body}</main>
+    <nav class="tabbar"><div class="in">${["home", "clients", "visits", "me"].map((t) =>
+      `<button class="tab ${S.tab === t ? "on" : ""}" data-act="tab" data-t="${t}"><svg viewBox="0 0 24 24">${ICON[t]}</svg>${titles[t]}</button>`).join("")}</div></nav>`;
+  refreshStatus();
+  if (S.tab === "clients") renderClientList();
+}
+
+function loginView() {
+  return `<div class="center"><div class="login">
+    <img class="logo" src="icon-192.png" alt="">
+    <h1 style="margin:0 0 4px">MedRep</h1><div class="note" style="margin:0 0 18px">تطبيق مندوبي المبيعات الطبية</div>
+    <label>البريد الإلكتروني</label><input id="em" type="email" inputmode="email" autocomplete="username" dir="ltr">
+    <label>كلمة المرور</label><input id="pw" type="password" autocomplete="current-password" dir="ltr">
+    <div class="err" id="lerr">${esc(S.loginErr)}</div>
+    <button class="btn block" data-act="login">دخول</button>
+    <div class="note">أول تسجيل دخول يحتاج إنترنت لتحميل بياناتك.</div></div></div>`;
+}
+
+function visitRow(v) {
+  const c = clientOf(v.client_id); const st = effStatus(v);
+  const when = isToday(v.planned_at) ? `<div class="time">${fmtTime(v.planned_at)}</div>`
+    : `<div class="time">${fmtDay(v.planned_at)}<small>${fmtTime(v.planned_at)}</small></div>`;
+  return `<div class="item ${st}" data-act="openVisit" data-id="${v.id}">${when}
+    <div class="grow"><div class="name">${esc(c?.name || "عميل محذوف")}</div>
+    <div class="meta">${esc([c ? CTYPE[c.type] : "", c?.specialty, isMgr() ? repName(v.rep_id) : ""].filter(Boolean).join(" · "))}</div></div>
+    <span class="badge ${st}">${VST[st]}</span></div>`;
+}
+
+function homeView() {
+  const first = (S.profile.full_name || "").split(" ")[0];
+  const today = S.data.visits.filter((v) => isToday(v.planned_at) || isToday(v.started_at))
+    .sort((a, b) => (a.planned_at || "").localeCompare(b.planned_at || ""));
+  const done = today.filter((v) => v.status === "completed").length;
+  const open = today.filter((v) => v.status !== "cancelled");
+  return `<div style="margin-bottom:12px"><b style="font-size:20px">أهلا ${esc(first)}</b>
+    <div class="meta">${ROLE[S.profile.role]}${S.company ? " · " + esc(S.company.name) : ""}</div></div>
+    <div class="stats"><div class="stat"><b>${open.length}</b><span>زيارات اليوم</span></div>
+    <div class="stat"><b>${done}</b><span>منتهية</span></div>
+    <div class="stat"><b>${S.data.clients.length}</b><span>عملاء</span></div></div>
+    <h2>جدول اليوم</h2>
+    ${open.length ? `<div class="list">${open.map(visitRow).join("")}</div>`
+      : `<div class="list"><div class="empty">لا توجد زيارات اليوم.</div></div>`}
+    <div class="row-btns"><button class="btn" data-act="newVisit">+ زيارة جديدة</button></div>`;
+}
+
+function clientsView() {
+  const chips = [["all", "الكل"], ["doctor", "أطباء"], ["pharmacy", "صيدليات"], ["hospital", "مستشفيات"]];
+  return `<div class="row-btns" style="margin:0 0 12px"><button class="btn" data-act="newClient">+ عميل جديد</button></div>
+    <input id="q" type="search" placeholder="ابحث بالاسم أو التخصص أو العنوان" value="${esc(S.q)}">
+    <div class="seg" style="margin-top:12px">${chips.map(([k, l]) => `<button class="${S.cf === k ? "on" : ""}" data-act="cf" data-k="${k}">${l}</button>`).join("")}</div>
+    <div id="clist"></div>`;
+}
+function renderClientList() {
+  const q = S.q.trim().toLowerCase();
+  const rows = S.data.clients.filter((c) => (S.cf === "all" || c.type === S.cf) &&
+    (!q || [c.name, c.specialty, c.address].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  $("#clist").innerHTML = rows.length
+    ? `<div class="list">${rows.map((c) => `<div class="item" data-act="openClient" data-id="${c.id}"><div class="grow">
+        <div class="name">${esc(c.name)}</div><div class="meta">${esc([CTYPE[c.type], c.specialty, c.address].filter(Boolean).join(" · "))}</div></div></div>`).join("")}</div>`
+    : `<div class="list"><div class="empty">${S.data.clients.length ? "لا نتائج مطابقة." : "لا يوجد عملاء بعد. أضف أول طبيب أو صيدلية."}</div></div>`;
+}
+
+function visitsView() {
+  const t0 = startOfToday().getTime(), t1 = t0 + 864e5;
+  const ts = (v) => new Date(v.planned_at || v.created_at).getTime();
+  let rows = S.data.visits;
+  if (S.vf === "today") rows = rows.filter((v) => ts(v) >= t0 && ts(v) < t1).sort((a, b) => ts(a) - ts(b));
+  else if (S.vf === "upcoming") rows = rows.filter((v) => ts(v) >= t1).sort((a, b) => ts(a) - ts(b));
+  else rows = rows.filter((v) => ts(v) < t0).sort((a, b) => ts(b) - ts(a));
+  const seg = [["today", "اليوم"], ["upcoming", "القادمة"], ["past", "السابقة"]];
+  return `<div class="row-btns" style="margin:0 0 12px"><button class="btn" data-act="newVisit">+ زيارة جديدة</button></div>
+    <div class="seg">${seg.map(([k, l]) => `<button class="${S.vf === k ? "on" : ""}" data-act="vf" data-k="${k}">${l}</button>`).join("")}</div>
+    ${rows.length ? `<div class="list">${rows.map(visitRow).join("")}</div>` : `<div class="list"><div class="empty">لا توجد زيارات هنا.</div></div>`}`;
+}
+
+function meView() {
+  return `<div class="box"><div class="kv"><span>الاسم</span><b>${esc(S.profile.full_name)}</b></div>
+    <div class="kv"><span>الدور</span><b>${ROLE[S.profile.role]}</b></div>
+    <div class="kv"><span>الشركة</span><b>${esc(S.company?.name || "—")}</b></div>
+    <div class="kv"><span>بانتظار الرفع</span><b>${S.pending}</b></div>
+    ${S.failed ? `<div class="kv"><span>تعذر رفعها</span><b style="color:var(--red)">${S.failed}</b></div>` : ""}</div>
+    <div class="row-btns"><button class="btn alt" data-act="sync">مزامنة الآن</button>
+    <button class="btn danger" data-act="logout">تسجيل الخروج</button></div>
+    <div class="note">النسخة 0.1 — تعمل بدون إنترنت وتُرفع البيانات تلقائيا عند عودة الاتصال.</div>`;
+}
+
+/* ================= النوافذ (Sheets) ================= */
+function openSheet(title, html) {
+  const sh = $("#sheet");
+  sh.innerHTML = `<div class="in"><header class="top"><button class="iconbtn" data-act="closeSheet" aria-label="رجوع">→</button><h1>${esc(title)}</h1></header><main>${html}</main></div>`;
+  sh.hidden = false; sh.scrollTop = 0;
+}
+function closeSheet() { $("#sheet").hidden = true; $("#sheet").innerHTML = ""; render(); }
+
+function clientForm(id) {
+  const c = id ? clientOf(id) : {};
+  const opt = (k, l) => `<option value="${k}" ${c.type === k ? "selected" : ""}>${l}</option>`;
+  openSheet(id ? "تعديل عميل" : "عميل جديد", `
+    <label>النوع</label><select id="cf-type">${opt("doctor", "طبيب")}${opt("pharmacy", "صيدلية")}${opt("hospital", "مستشفى")}</select>
+    <label>الاسم</label><input id="cf-name" value="${esc(c.name)}">
+    <label>التخصص (للأطباء)</label><input id="cf-spec" value="${esc(c.specialty)}">
+    <label>العنوان</label><input id="cf-addr" value="${esc(c.address)}">
+    <label>الهاتف</label><input id="cf-phone" type="tel" inputmode="tel" dir="ltr" value="${esc(c.phone)}">
+    <label>ملاحظات</label><textarea id="cf-notes">${esc(c.notes)}</textarea>
+    <input id="cf-lat" type="hidden" value="${c.lat ?? ""}"><input id="cf-lng" type="hidden" value="${c.lng ?? ""}">
+    <div class="row-btns"><button class="btn alt" data-act="geoClient" id="geo">${c.lat != null ? "تحديث الموقع" : "التقاط الموقع"}</button></div>
+    <div class="row-btns"><button class="btn" data-act="saveClient" data-id="${id || ""}">حفظ</button></div>`);
+}
+function clientSheet(id) {
+  const c = clientOf(id); if (!c) return;
+  const vs = S.data.visits.filter((v) => v.client_id === id).sort((a, b) => (b.planned_at || "").localeCompare(a.planned_at || "")).slice(0, 8);
+  openSheet(c.name, `<div class="box">
+    <div class="kv"><span>النوع</span><b>${CTYPE[c.type]}</b></div>
+    ${c.specialty ? `<div class="kv"><span>التخصص</span><b>${esc(c.specialty)}</b></div>` : ""}
+    ${c.address ? `<div class="kv"><span>العنوان</span><b>${esc(c.address)}</b></div>` : ""}
+    ${c.phone ? `<div class="kv"><span>الهاتف</span><a href="tel:${esc(c.phone)}" dir="ltr">${esc(c.phone)}</a></div>` : ""}
+    ${c.lat != null ? `<div class="kv"><span>الموقع</span><a href="https://www.google.com/maps?q=${c.lat},${c.lng}" target="_blank" rel="noopener">فتح الخريطة</a></div>` : ""}
+    ${c.notes ? `<div class="kv"><span>ملاحظات</span><b>${esc(c.notes)}</b></div>` : ""}</div>
+    <div class="row-btns"><button class="btn" data-act="newVisit" data-id="${id}">زيارة جديدة</button>
+    <button class="btn alt" data-act="editClient" data-id="${id}">تعديل</button></div>
+    <h2>آخر الزيارات</h2>${vs.length ? `<div class="list">${vs.map(visitRow).join("")}</div>` : `<div class="list"><div class="empty">لا زيارات سابقة.</div></div>`}`);
+}
+function visitForm(clientId) {
+  const cs = [...S.data.clients].sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  if (!cs.length) { toast("أضف عميلا أولا"); return; }
+  const d = new Date(); d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
+  openSheet("زيارة جديدة", `<label>العميل</label>
+    <select id="vf-client">${cs.map((c) => `<option value="${c.id}" ${c.id === clientId ? "selected" : ""}>${esc(c.name)} — ${CTYPE[c.type]}</option>`).join("")}</select>
+    <label>الموعد</label><input id="vf-when" type="datetime-local" value="${toLocalInput(d)}">
+    <div class="row-btns"><button class="btn" data-act="saveVisit">حفظ الزيارة</button></div>`);
+}
+function visitSheet(id) {
+  const v = S.data.visits.find((x) => x.id === id); if (!v) return;
+  const c = clientOf(v.client_id); const st = effStatus(v);
+  const rp = S.data.reports.find((r) => r.visit_id === id);
+  const mine = v.rep_id === S.user.id;
+  const prods = S.data.products.filter((p) => p.active !== false);
+  const picked = new Set(rp?.products_discussed || []);
+  let action = "";
+  if (mine && v.status === "planned" && !v.started_at) {
+    action = `<div class="row-btns"><button class="btn" data-act="checkin" data-id="${id}">تسجيل الوصول</button>
+      <button class="btn danger" data-act="cancelVisit" data-id="${id}">إلغاء الزيارة</button></div>`;
+  } else if (mine && v.status === "planned") {
+    action = `<h2>تقرير الزيارة</h2>
+      <label>الملاحظات</label><textarea id="rp-notes">${esc(rp?.notes)}</textarea>
+      <label>المنتجات التي نوقشت</label>
+      ${prods.length ? `<div class="box checks">${prods.map((p) => `<label><input type="checkbox" class="rp-p" value="${p.id}" ${picked.has(p.id) ? "checked" : ""}>${esc(p.name)}</label>`).join("")}</div>`
+        : `<div class="note">لا توجد منتجات مضافة بعد.</div>`}
+      <label>موعد المتابعة (اختياري)</label><input id="rp-follow" type="date" value="${rp?.followup_date || ""}">
+      <div class="row-btns"><button class="btn alt" data-act="saveReport" data-id="${id}">حفظ مسودة</button>
+      <button class="btn" data-act="finishVisit" data-id="${id}">إنهاء الزيارة</button></div>`;
+  } else if (rp) {
+    const names = (rp.products_discussed || []).map((pid) => S.data.products.find((p) => p.id === pid)?.name).filter(Boolean);
+    action = `<h2>تقرير الزيارة</h2><div class="box"><div class="kv"><span>الملاحظات</span><b style="white-space:pre-wrap">${esc(rp.notes) || "—"}</b></div>
+      ${names.length ? `<div class="kv"><span>المنتجات</span><b>${esc(names.join("، "))}</b></div>` : ""}
+      ${rp.followup_date ? `<div class="kv"><span>المتابعة</span><b>${esc(rp.followup_date)}</b></div>` : ""}</div>`;
+  }
+  openSheet(c?.name || "زيارة", `<div class="box">
+    <div class="kv"><span>الحالة</span><span class="badge ${st}">${VST[st]}</span></div>
+    <div class="kv"><span>الموعد</span><b>${fmtDay(v.planned_at)} ${fmtTime(v.planned_at)}</b></div>
+    ${isMgr() ? `<div class="kv"><span>المندوب</span><b>${esc(repName(v.rep_id))}</b></div>` : ""}
+    ${v.started_at ? `<div class="kv"><span>وصل</span><b>${fmtTime(v.started_at)}</b></div>` : ""}
+    ${v.ended_at ? `<div class="kv"><span>انتهت</span><b>${fmtTime(v.ended_at)}</b></div>` : ""}</div>${action}`);
+}
+
+/* ================= الأحداث ================= */
+const val = (id) => ($(id)?.value || "").trim();
+async function saveReportRow(id) {
+  const v = S.data.visits.find((x) => x.id === id);
+  const ex = S.data.reports.find((r) => r.visit_id === id);
+  const row = ex ? { ...ex } : { id: uid(), company_id: S.profile.company_id, rep_id: S.user.id, visit_id: id, created_at: nowISO(), deleted_at: null };
+  row.notes = val("#rp-notes");
+  row.products_discussed = [...document.querySelectorAll(".rp-p:checked")].map((x) => x.value);
+  row.followup_date = val("#rp-follow") || null;
+  await save("visit_reports", row);
+  return v;
+}
+const ACT = {
+  tab: (d) => { S.tab = d.t; render(); },
+  vf: (d) => { S.vf = d.k; render(); },
+  cf: (d) => { S.cf = d.k; render(); },
+  sync: () => sync(true),
+  closeSheet,
+  async login() {
+    if (!sb) { toast("تعذر تحميل المكتبة، تأكد من الإنترنت وأعد فتح الصفحة"); return; }
+    const email = val("#em"), pw = $("#pw").value;
+    if (!email || !pw) { $("#lerr").textContent = "اكتب البريد وكلمة المرور"; return; }
+    if (!navigator.onLine) { $("#lerr").textContent = "يلزم اتصال بالإنترنت لتسجيل الدخول"; return; }
+    $("#lerr").textContent = "جاري الدخول…";
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) { S.loginErr = /invalid/i.test(error.message) ? "البريد أو كلمة المرور غير صحيحة" : "تعذر الاتصال، حاول مرة أخرى"; $("#lerr").textContent = S.loginErr; return; }
+    S.user = data.user; S.loginErr = "";
+    await sync();
+    if (!S.profile) { await sb.auth.signOut(); S.user = null; S.loginErr = "هذا الحساب غير مرتبط بأي شركة"; render(); return; }
+    await dbPut("meta", { k: "me", v: { user_id: S.user.id } });
+    render();
+  },
+  async logout() {
+    if (S.pending && !confirm(`يوجد ${S.pending} عنصر لم يُرفع بعد وسيضيع إن خرجت الآن. هل تريد الخروج؟`)) return;
+    await sb.auth.signOut(); await dbClear();
+    Object.assign(S, { user: null, profile: null, company: null, tab: "home", pending: 0, failed: 0, data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [] } });
+    render();
+  },
+  newClient: () => clientForm(),
+  editClient: (d) => clientForm(d.id),
+  openClient: (d) => clientSheet(d.id),
+  async geoClient() {
+    const b = $("#geo"); b.textContent = "جاري تحديد الموقع…";
+    const p = await getPos();
+    if (p) { $("#cf-lat").value = p.lat; $("#cf-lng").value = p.lng; b.textContent = "تم التقاط الموقع ✓"; }
+    else b.textContent = "تعذر تحديد الموقع، أعد المحاولة";
+  },
+  async saveClient(d) {
+    if (!val("#cf-name")) { toast("اكتب اسم العميل"); return; }
+    const ex = d.id ? clientOf(d.id) : null;
+    const row = ex ? { ...ex } : { id: uid(), company_id: S.profile.company_id, assigned_rep_id: S.user.id, created_at: nowISO(), deleted_at: null };
+    Object.assign(row, {
+      type: val("#cf-type"), name: val("#cf-name"), specialty: val("#cf-spec") || null, address: val("#cf-addr") || null,
+      phone: val("#cf-phone") || null, notes: val("#cf-notes") || null,
+      lat: val("#cf-lat") === "" ? null : Number(val("#cf-lat")), lng: val("#cf-lng") === "" ? null : Number(val("#cf-lng"))
+    });
+    await save("clients", row); closeSheet(); toast("تم حفظ العميل");
+  },
+  newVisit: (d) => visitForm(d.id),
+  async saveVisit() {
+    const when = val("#vf-when"); if (!when) { toast("حدد الموعد"); return; }
+    await save("visits", { id: uid(), company_id: S.profile.company_id, rep_id: S.user.id, client_id: val("#vf-client"),
+      planned_at: new Date(when).toISOString(), status: "planned", created_at: nowISO(), deleted_at: null });
+    closeSheet(); toast("تمت إضافة الزيارة");
+  },
+  openVisit: (d) => visitSheet(d.id),
+  async checkin(d) {
+    toast("جاري تحديد موقعك…");
+    const p = await getPos(); const v = { ...S.data.visits.find((x) => x.id === d.id) };
+    v.started_at = nowISO(); if (p) { v.lat = p.lat; v.lng = p.lng; }
+    await save("visits", v); visitSheet(d.id); toast(p ? "تم تسجيل الوصول" : "سُجل الوصول بدون موقع");
+  },
+  async cancelVisit(d) {
+    if (!confirm("إلغاء هذه الزيارة؟")) return;
+    const v = { ...S.data.visits.find((x) => x.id === d.id), status: "cancelled" };
+    await save("visits", v); closeSheet();
+  },
+  async saveReport(d) { await saveReportRow(d.id); toast("تم حفظ المسودة"); },
+  async finishVisit(d) {
+    if (!val("#rp-notes")) { toast("اكتب ملاحظات الزيارة أولا"); return; }
+    await saveReportRow(d.id);
+    const v = { ...S.data.visits.find((x) => x.id === d.id), status: "completed", ended_at: nowISO() };
+    await save("visits", v); closeSheet(); toast("تم إنهاء الزيارة");
+  }
+};
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const fn = ACT[el.dataset.act]; if (fn) fn(el.dataset, el);
+});
+document.addEventListener("input", (e) => { if (e.target.id === "q") { S.q = e.target.value; renderClientList(); } });
+window.addEventListener("online", () => { refreshStatus(); sync(); });
+window.addEventListener("offline", refreshStatus);
+setInterval(() => { if (document.visibilityState === "visible") sync(); }, 60000);
+
+/* ================= البدء ================= */
+(async function init() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (!sb) { S.setup = !!window.supabase; S.ready = true; render(); return; }
+  let user = null;
+  try { const { data } = await sb.auth.getSession(); user = data.session?.user || null; } catch (e) { /* بدون إنترنت */ }
+  if (!user) { const me = (await dbGet("meta", "me"))?.v; if (me && !navigator.onLine) user = { id: me.user_id }; }
+  S.user = user;
+  await loadLocal();
+  if (user && !S.profile && navigator.onLine) { await sync(); }
+  S.ready = true; render(); refreshPending();
+  if (user && S.profile) sync();
+})();
+</script>
+</body>
+</html>
