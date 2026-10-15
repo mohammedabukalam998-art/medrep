@@ -1,12 +1,12 @@
 // Service worker: يخزّن ملفات التطبيق ليعمل بدون إنترنت
 // عند تحديث الملفات غيّر رقم النسخة V ليصل التحديث للمستخدمين
-const V = "medrep-v1";
+const V = "medrep-v2";
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 const SHELL = ["./", "index.html", "config.js", "manifest.json", "icon-192.png", "icon-512.png", SUPABASE_JS];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(V).then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => null)))).then(() => self.skipWaiting())
+    caches.open(V).then((c) => Promise.all(SHELL.map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => null)))).then(() => self.skipWaiting())
   );
 });
 

@@ -134,20 +134,21 @@ const ICON = {
   clients: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5a3.5 3.5 0 0 1 0 6.5M18 14c2.2.6 3.5 2.4 3.5 5"/>',
   visits: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   me: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>',
+  samples: '<path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14-4M4 5v4h4M4 13a8 8 0 0 0 14 4M20 19v-4h-4"/>'
 };
 const svg = (n) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
 
 /* ================= التخزين المحلي (IndexedDB) ================= */
-const STORES = ["companies", "profiles", "clients", "products", "visits", "visit_reports"];
+const STORES = ["companies", "profiles", "clients", "products", "visits", "visit_reports", "sample_movements"];
 let _db;
 const idb = () => (_db ||= new Promise((res, rej) => {
-  const r = indexedDB.open("medrep", 1);
+  const r = indexedDB.open("medrep", 2);
   r.onupgradeneeded = () => {
-    const d = r.result;
-    STORES.forEach((s) => d.createObjectStore(s, { keyPath: "id" }));
-    d.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true });
-    d.createObjectStore("meta", { keyPath: "k" });
+    const d = r.result, has = (n) => d.objectStoreNames.contains(n);
+    STORES.forEach((s) => { if (!has(s)) d.createObjectStore(s, { keyPath: "id" }); });
+    if (!has("outbox")) d.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true });
+    if (!has("meta")) d.createObjectStore("meta", { keyPath: "k" });
   };
   r.onsuccess = () => res(r.result);
   r.onerror = () => rej(r.error);
@@ -166,9 +167,9 @@ const dbClear = async () => { for (const s of [...STORES, "outbox", "meta"]) awa
 const S = {
   ready: false, setup: false, user: null, profile: null, company: null,
   tab: "home", vf: "today", cf: "all", q: "", syncing: false, pending: 0, failed: 0, loginErr: "",
-  data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [] }
+  data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [], samples: [] }
 };
-const KEYMAP = { companies: "companies", profiles: "profiles", clients: "clients", products: "products", visits: "visits", reports: "visit_reports" };
+const KEYMAP = { companies: "companies", profiles: "profiles", clients: "clients", products: "products", visits: "visits", reports: "visit_reports", samples: "sample_movements" };
 async function loadLocal() {
   for (const k of Object.keys(KEYMAP)) S.data[k] = (await dbAll(KEYMAP[k])).filter((r) => !r.deleted_at);
   S.profile = S.user ? S.data.profiles.find((p) => p.id === S.user.id) || null : null;
@@ -249,12 +250,12 @@ function render() {
     return;
   }
   if (!S.user || !S.profile) { app.innerHTML = loginView(); return; }
-  const titles = { home: "اليوم", clients: "العملاء", visits: "الزيارات", me: "حسابي" };
-  const body = { home: homeView, clients: clientsView, visits: visitsView, me: meView }[S.tab]();
+  const titles = { home: "اليوم", clients: "العملاء", visits: "الزيارات", samples: "العينات", me: "حسابي" };
+  const body = { home: homeView, clients: clientsView, visits: visitsView, samples: samplesView, me: meView }[S.tab]();
   app.innerHTML = `<header class="top"><h1>${titles[S.tab]}</h1><span id="chip" class="chip"></span>
     <button class="iconbtn" data-act="sync" aria-label="مزامنة">${svg("sync")}</button></header>
     <main>${body}</main>
-    <nav class="tabbar"><div class="in">${["home", "clients", "visits", "me"].map((t) =>
+    <nav class="tabbar"><div class="in">${["home", "clients", "visits", "samples", "me"].map((t) =>
       `<button class="tab ${S.tab === t ? "on" : ""}" data-act="tab" data-t="${t}"><svg viewBox="0 0 24 24">${ICON[t]}</svg>${titles[t]}</button>`).join("")}</div></nav>`;
   refreshStatus();
   if (S.tab === "clients") renderClientList();
@@ -337,7 +338,53 @@ function meView() {
     ${S.failed ? `<div class="kv"><span>تعذر رفعها</span><b style="color:var(--red)">${S.failed}</b></div>` : ""}</div>
     <div class="row-btns"><button class="btn alt" data-act="sync">مزامنة الآن</button>
     <button class="btn danger" data-act="logout">تسجيل الخروج</button></div>
-    <div class="note">النسخة 0.1 — تعمل بدون إنترنت وتُرفع البيانات تلقائيا عند عودة الاتصال.</div>`;
+    <div class="note">النسخة 0.2 — تعمل بدون إنترنت وتُرفع البيانات تلقائيا عند عودة الاتصال.</div>`;
+}
+
+/* ===== العينات والمنتجات ===== */
+const KIND = { issue_to_rep: "صرف من الشركة", give_to_client: "تسليم لعميل", return: "إرجاع للشركة", adjust: "تسوية" };
+const SIGN = { issue_to_rep: 1, adjust: 1, give_to_client: -1, return: -1 };
+const FORMS = ["أقراص", "كبسولات", "شراب", "حقن", "كريم/مرهم", "قطرات", "أخرى"];
+const prodOf = (id) => S.data.products.find((p) => p.id === id);
+function stockMap(repId) {
+  const m = {};
+  S.data.samples.filter((s) => s.rep_id === repId).forEach((s) => { m[s.product_id] = (m[s.product_id] || 0) + SIGN[s.kind] * s.qty; });
+  return m;
+}
+const byNewest = (a, b) => (b.created_at || "").localeCompare(a.created_at || "");
+function moveRow(s) {
+  const p = prodOf(s.product_id), c = clientOf(s.client_id), plus = SIGN[s.kind] > 0;
+  return `<div class="item"><div class="grow"><div class="name">${esc(p?.name || "منتج")} × ${s.qty}</div>
+    <div class="meta">${KIND[s.kind]}${c ? " · " + esc(c.name) : ""}${isMgr() ? " · " + esc(repName(s.rep_id)) : ""} · ${fmtDay(s.created_at)}</div></div>
+    <span class="badge ${plus ? "completed" : "cancelled"}">${plus ? "+" : "−"}${Math.abs(s.qty)}</span></div>`;
+}
+function samplesView() {
+  const mgr = isMgr();
+  const row1 = (mgr ? `<div class="row-btns" style="margin:0 0 10px"><button class="btn" data-act="issueSample">صرف عينات</button></div>` : "")
+    + `<div class="row-btns" style="margin:0 0 10px"><button class="btn ${mgr ? "alt" : ""}" data-act="giveSample">تسليم لعميل</button><button class="btn alt" data-act="returnSample">إرجاع للشركة</button></div>`;
+  let stock;
+  if (mgr) {
+    const holders = new Set(S.data.samples.map((s) => s.rep_id));
+    const reps = S.data.profiles.filter((p) => p.active !== false && (p.role === "rep" || holders.has(p.id)));
+    stock = reps.length ? `<div class="list">${reps.map((r) => {
+      const tot = Object.values(stockMap(r.id)).reduce((a, b) => a + b, 0);
+      return `<div class="item" data-act="openRep" data-id="${r.id}"><div class="grow"><div class="name">${esc(r.full_name)}</div><div class="meta">إجمالي العينات المتبقية</div></div><b>${tot}</b></div>`;
+    }).join("")}</div>` : `<div class="list"><div class="empty">لا يوجد مندوبون بعد.</div></div>`;
+  } else {
+    const m = stockMap(S.user.id), ids = Object.keys(m).filter((k) => m[k] !== 0);
+    stock = ids.length ? `<div class="list">${ids.map((k) => `<div class="item"><div class="grow"><div class="name">${esc(prodOf(k)?.name || "منتج")}</div></div><b>${m[k]}</b></div>`).join("")}</div>`
+      : `<div class="list"><div class="empty">لا توجد عينات معك حاليا. سيصرف لك المدير عينات.</div></div>`;
+  }
+  const mv = S.data.samples.filter((s) => mgr || s.rep_id === S.user.id).sort(byNewest).slice(0, 20);
+  return `${row1}
+    <div class="row-btns" style="margin:0 0 4px"><button class="btn alt" data-act="products">${mgr ? "إدارة المنتجات" : "كتالوج المنتجات"}</button></div>
+    <h2>${mgr ? "مخزون المندوبين" : "عيناتي"}</h2>${stock}
+    <h2>آخر الحركات</h2>${mv.length ? `<div class="list">${mv.map(moveRow).join("")}</div>` : `<div class="list"><div class="empty">لا توجد حركات بعد.</div></div>`}`;
+}
+function givenList(vid) {
+  const rows = S.data.samples.filter((s) => s.visit_id === vid && s.kind === "give_to_client");
+  if (!rows.length) return "";
+  return `<h2>العينات المسلّمة</h2><div class="box">${rows.map((s) => `<div class="kv"><span>${esc(prodOf(s.product_id)?.name || "منتج")}</span><b>${s.qty}</b></div>`).join("")}</div>`;
 }
 
 /* ================= النوافذ (Sheets) ================= */
@@ -403,6 +450,7 @@ function visitSheet(id) {
       ${prods.length ? `<div class="box checks">${prods.map((p) => `<label><input type="checkbox" class="rp-p" value="${p.id}" ${picked.has(p.id) ? "checked" : ""}>${esc(p.name)}</label>`).join("")}</div>`
         : `<div class="note">لا توجد منتجات مضافة بعد.</div>`}
       <label>موعد المتابعة (اختياري)</label><input id="rp-follow" type="date" value="${rp?.followup_date || ""}">
+      <div class="row-btns"><button class="btn alt" data-act="giveSample" data-v="${id}" data-c="${v.client_id}">تسليم عينات في هذه الزيارة</button></div>
       <div class="row-btns"><button class="btn alt" data-act="saveReport" data-id="${id}">حفظ مسودة</button>
       <button class="btn" data-act="finishVisit" data-id="${id}">إنهاء الزيارة</button></div>`;
   } else if (rp) {
@@ -416,7 +464,61 @@ function visitSheet(id) {
     <div class="kv"><span>الموعد</span><b>${fmtDay(v.planned_at)} ${fmtTime(v.planned_at)}</b></div>
     ${isMgr() ? `<div class="kv"><span>المندوب</span><b>${esc(repName(v.rep_id))}</b></div>` : ""}
     ${v.started_at ? `<div class="kv"><span>وصل</span><b>${fmtTime(v.started_at)}</b></div>` : ""}
-    ${v.ended_at ? `<div class="kv"><span>انتهت</span><b>${fmtTime(v.ended_at)}</b></div>` : ""}</div>${action}`);
+    ${v.ended_at ? `<div class="kv"><span>انتهت</span><b>${fmtTime(v.ended_at)}</b></div>` : ""}</div>${action}${givenList(id)}`);
+}
+
+function repSheet(id) {
+  const m = stockMap(id), ids = Object.keys(m).filter((k) => m[k] !== 0);
+  const mv = S.data.samples.filter((s) => s.rep_id === id).sort(byNewest).slice(0, 30);
+  openSheet(repName(id), `<h2 style="margin-top:0">المتبقي مع المندوب</h2>
+    ${ids.length ? `<div class="list">${ids.map((k) => `<div class="item"><div class="grow"><div class="name">${esc(prodOf(k)?.name || "منتج")}</div></div><b>${m[k]}</b></div>`).join("")}</div>`
+      : `<div class="list"><div class="empty">لا توجد عينات مع هذا المندوب.</div></div>`}
+    <div class="row-btns"><button class="btn" data-act="issueSample" data-id="${id}">صرف عينات له</button></div>
+    <h2>الحركات</h2>${mv.length ? `<div class="list">${mv.map(moveRow).join("")}</div>` : `<div class="list"><div class="empty">لا توجد حركات.</div></div>`}`);
+}
+function productsSheet() {
+  const mgr = isMgr();
+  const rows = [...S.data.products].sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  openSheet("المنتجات", `${mgr ? `<div class="row-btns" style="margin:0 0 12px"><button class="btn" data-act="newProduct">+ منتج جديد</button></div>` : ""}
+    ${rows.length ? `<div class="list">${rows.map((p) => `<div class="item ${p.active === false ? "cancelled" : ""}" ${mgr ? `data-act="editProduct" data-id="${p.id}"` : ""}>
+      <div class="grow"><div class="name">${esc(p.name)}</div>
+      <div class="meta">${esc([p.form, p.generic_name, p.price != null ? Number(p.price).toLocaleString("en") : ""].filter(Boolean).join(" · "))}</div></div>
+      ${p.active === false ? '<span class="badge cancelled">موقوف</span>' : ""}</div>`).join("")}</div>`
+      : `<div class="list"><div class="empty">${mgr ? "لا توجد منتجات بعد. أضف أول منتج." : "لم تُضف منتجات بعد."}</div></div>`}`);
+}
+function productForm(id) {
+  const p = id ? prodOf(id) : {};
+  openSheet(id ? "تعديل منتج" : "منتج جديد", `
+    <label>اسم المنتج</label><input id="pf-name" value="${esc(p.name)}">
+    <label>الاسم العلمي</label><input id="pf-gen" dir="ltr" value="${esc(p.generic_name)}">
+    <label>الشكل الدوائي</label><select id="pf-form"><option value="">—</option>${FORMS.map((f) => `<option ${p.form === f ? "selected" : ""}>${f}</option>`).join("")}</select>
+    <label>السعر</label><input id="pf-price" type="number" inputmode="decimal" min="0" step="any" value="${p.price ?? ""}">
+    <label>وصف مختصر</label><textarea id="pf-desc">${esc(p.description)}</textarea>
+    <div class="box checks" style="margin-top:14px"><label><input id="pf-active" type="checkbox" ${p.active === false ? "" : "checked"}>المنتج فعّال</label></div>
+    <div class="row-btns"><button class="btn" data-act="saveProduct" data-id="${id || ""}">حفظ</button></div>`);
+}
+function moveForm(o) {
+  const kind = o.kind, issue = kind === "issue_to_rep";
+  const actives = S.data.products.filter((p) => p.active !== false);
+  if (!actives.length) { toast("لا توجد منتجات. أضف منتجات أولا"); return; }
+  const stock = issue ? null : stockMap(S.user.id);
+  const prods = issue ? actives : actives.filter((p) => (stock[p.id] || 0) > 0);
+  if (!prods.length) { toast("لا توجد عينات معك حاليا"); return; }
+  let who = "";
+  if (issue) {
+    const reps = S.data.profiles.filter((p) => p.active !== false).sort((a, b) => (a.role === "rep" ? 0 : 1) - (b.role === "rep" ? 0 : 1));
+    if (!reps.length) { toast("لا يوجد أعضاء في الشركة"); return; }
+    who = `<label>المستلم</label><select id="mv-rep">${reps.map((r) => `<option value="${r.id}" ${r.id === o.repId ? "selected" : ""}>${esc(r.full_name)}${r.role === "rep" ? "" : " (" + ROLE[r.role] + ")"}</option>`).join("")}</select>`;
+  } else if (kind === "give_to_client") {
+    const cs = [...S.data.clients].sort((a, b) => a.name.localeCompare(b.name, "ar"));
+    if (!cs.length) { toast("أضف عميلا أولا"); return; }
+    who = `<label>العميل</label><select id="mv-client">${cs.map((c) => `<option value="${c.id}" ${c.id === o.clientId ? "selected" : ""}>${esc(c.name)} — ${CTYPE[c.type]}</option>`).join("")}</select>`;
+  }
+  const title = { give_to_client: "تسليم عينات لعميل", return: "إرجاع عينات للشركة", issue_to_rep: "صرف عينات لمندوب" }[kind];
+  openSheet(title, `${who}
+    <label>المنتج</label><select id="mv-prod">${prods.map((p) => `<option value="${p.id}">${esc(p.name)}${issue ? "" : ` (المتاح ${stock[p.id]})`}</option>`).join("")}</select>
+    <label>الكمية</label><input id="mv-qty" type="number" inputmode="numeric" min="1" step="1" value="1">
+    <div class="row-btns"><button class="btn" data-act="saveMove" data-k="${kind}" data-v="${o.visitId || ""}">حفظ</button></div>`);
 }
 
 /* ================= الأحداث ================= */
@@ -454,7 +556,7 @@ const ACT = {
   async logout() {
     if (S.pending && !confirm(`يوجد ${S.pending} عنصر لم يُرفع بعد وسيضيع إن خرجت الآن. هل تريد الخروج؟`)) return;
     await sb.auth.signOut(); await dbClear();
-    Object.assign(S, { user: null, profile: null, company: null, tab: "home", pending: 0, failed: 0, data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [] } });
+    Object.assign(S, { user: null, profile: null, company: null, tab: "home", pending: 0, failed: 0, data: { companies: [], profiles: [], clients: [], products: [], visits: [], reports: [], samples: [] } });
     render();
   },
   newClient: () => clientForm(),
@@ -502,6 +604,38 @@ const ACT = {
     await saveReportRow(d.id);
     const v = { ...S.data.visits.find((x) => x.id === d.id), status: "completed", ended_at: nowISO() };
     await save("visits", v); closeSheet(); toast("تم إنهاء الزيارة");
+  },
+  products: () => productsSheet(),
+  newProduct: () => productForm(),
+  editProduct: (d) => productForm(d.id),
+  async saveProduct(d) {
+    if (!val("#pf-name")) { toast("اكتب اسم المنتج"); return; }
+    const ex = d.id ? prodOf(d.id) : null;
+    const row = ex ? { ...ex } : { id: uid(), company_id: S.profile.company_id, created_at: nowISO(), deleted_at: null };
+    Object.assign(row, {
+      name: val("#pf-name"), generic_name: val("#pf-gen") || null, form: val("#pf-form") || null,
+      price: val("#pf-price") === "" ? null : Number(val("#pf-price")), description: val("#pf-desc") || null,
+      active: $("#pf-active").checked
+    });
+    await save("products", row); productsSheet(); toast("تم حفظ المنتج");
+  },
+  issueSample: (d) => moveForm({ kind: "issue_to_rep", repId: d.id }),
+  returnSample: () => moveForm({ kind: "return" }),
+  async giveSample(d) {
+    if (d.v && $("#rp-notes")) await saveReportRow(d.v);
+    moveForm({ kind: "give_to_client", clientId: d.c, visitId: d.v });
+  },
+  openRep: (d) => repSheet(d.id),
+  async saveMove(d) {
+    const kind = d.k, qty = parseInt(val("#mv-qty"), 10), pid = val("#mv-prod");
+    if (!(qty > 0)) { toast("اكتب كمية صحيحة"); return; }
+    let repId = S.user.id;
+    if (kind === "issue_to_rep") repId = val("#mv-rep");
+    else if ((stockMap(S.user.id)[pid] || 0) < qty) { toast("الكمية أكبر من المتاح معك"); return; }
+    await save("sample_movements", { id: uid(), company_id: S.profile.company_id, rep_id: repId, product_id: pid,
+      client_id: kind === "give_to_client" ? val("#mv-client") : null, visit_id: d.v || null, kind, qty, created_at: nowISO(), deleted_at: null });
+    if (d.v) visitSheet(d.v); else closeSheet();
+    toast("تم الحفظ");
   }
 };
 document.addEventListener("click", (e) => {
